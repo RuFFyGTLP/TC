@@ -11,13 +11,13 @@ const state = {
     },
     counters: { taskId: 0, handoffId: 0 },
     settings: {
-        orquestador: { enabled: true, name: 'Orquestador Principal', provider: 'antigravity', model: 'antigravity-1', spec: 'architect', endpoint: '', temperature: 0.7 },
-        implementador: { enabled: true, name: 'Implementador Dev', provider: 'antigravity', model: 'antigravity-1', spec: 'fullstack', endpoint: '', temperature: 0.3 },
+        orquestador: { enabled: true, name: 'Orquestador Principal', provider: 'ollama', model: 'llama3.2', spec: 'architect', endpoint: '', temperature: 0.7 },
+        implementador: { enabled: true, name: 'Implementador Dev', provider: 'ollama', model: 'llama3.2', spec: 'fullstack', endpoint: '', temperature: 0.3 },
         system: { projectName: 'Multi-Agent Hub', workDir: 'e:/Proyectos/TC', syncInterval: 10, notifications: true, darkTheme: true },
         advanced: { parallelLimit: 3, logLevel: 'info', logRetention: 30, handoffTimeout: 15 },
         integrations: {
             openai: '', anthropic: '', google: '', mistral: '', groq: '', github: '',
-            ollama: { endpoint: 'http://localhost:11434', defaultModel: '' },
+            ollama: { endpoint: 'http://localhost:11434', defaultModel: 'llama3.2' },
             lmstudio: { endpoint: 'http://localhost:1234', defaultModel: '' }
         }
     }
@@ -72,7 +72,38 @@ function loadState() {
     const saved = localStorage.getItem('agentHubState');
     if (saved) {
         const parsed = JSON.parse(saved);
+
+        // Config migration: Remove antigravity (deprecated)
+        if (parsed.settings?.orquestador?.provider === 'antigravity') {
+            parsed.settings.orquestador.provider = 'ollama';
+            parsed.settings.orquestador.model = ''; // Let detection fill it
+        }
+        if (parsed.settings?.implementador?.provider === 'antigravity') {
+            parsed.settings.implementador.provider = 'ollama';
+            parsed.settings.implementador.model = '';
+        }
+
         Object.assign(state, parsed);
+    }
+    // Try loading from IndexedDB if available (async)
+    if (typeof loadStateDB === 'function') {
+        loadStateDB().then(dbState => {
+            if (dbState) {
+                // Same migration for DB state
+                if (dbState.settings?.orquestador?.provider === 'antigravity') {
+                    dbState.settings.orquestador.provider = 'ollama';
+                    dbState.settings.orquestador.model = '';
+                }
+                if (dbState.settings?.implementador?.provider === 'antigravity') {
+                    dbState.settings.implementador.provider = 'ollama';
+                    dbState.settings.implementador.model = '';
+                }
+                Object.assign(state, dbState);
+                console.log('Estado cargado desde IndexedDB');
+                updateUI();
+                if (typeof updateChatContextDisplay === 'function') updateChatContextDisplay();
+            }
+        });
     }
 
     // Add initial activity if empty
@@ -743,43 +774,91 @@ const modelsCatalog = {
     ],
     codeium: [
         { value: 'codeium-default', label: 'Codeium Default' }
+    ],
+    // Local providers will be populated dynamically
+    ollama: [],
+    lmstudio: [],
+    antigravity: [
+        { value: 'antigravity-1', label: 'Antigravity v1 (Experimental)' }
     ]
 };
 
-function updateModelList(agent) {
+// Update local provider catalogs from detection module
+function updateLocalCatalogs() {
+    if (typeof getAllLocalModels === 'function') {
+        const local = getAllLocalModels();
+
+        if (local.ollama?.connected) {
+            modelsCatalog.ollama = local.ollama.models.map(m => ({
+                value: m.name,
+                label: `${m.name} (${m.size || 'Unknown'})`
+            }));
+        }
+
+        if (local.lmstudio?.connected) {
+            modelsCatalog.lmstudio = local.lmstudio.models.map(m => ({
+                value: m.id,
+                label: m.name || m.id
+            }));
+        }
+    }
+}
+
+async function updateModelList(agent) {
     const providerSelect = document.getElementById(`${agent}Provider`);
     const modelSelect = document.getElementById(`${agent}Model`);
     const endpointInput = document.getElementById(`${agent}Endpoint`);
 
     if (!providerSelect || !modelSelect) return;
 
+    // Refresh local catalogs first
+    updateLocalCatalogs();
+
     const provider = providerSelect.value;
-    const models = modelsCatalog[provider] || [];
+    let models = modelsCatalog[provider] || [];
+
+    // If local provider has no models, try to detect again
+    if ((provider === 'ollama' || provider === 'lmstudio') && models.length === 0) {
+        if (typeof detectAllLocalModels === 'function') {
+            await detectAllLocalModels();
+            updateLocalCatalogs();
+            models = modelsCatalog[provider] || [];
+        }
+    }
 
     // Clear and populate model select
+    const currentModel = modelSelect.value || state.settings[agent]?.model;
     modelSelect.innerHTML = '';
-    models.forEach(model => {
+
+    if (models.length > 0) {
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.value;
+            option.textContent = model.label;
+            if (model.value === currentModel) option.selected = true;
+            modelSelect.appendChild(option);
+        });
+    } else {
         const option = document.createElement('option');
-        option.value = model.value;
-        option.textContent = model.label;
+        option.textContent = provider === 'antigravity'
+            ? 'No disponible localmente'
+            : 'No se detectaron modelos (Revisa conexión)';
         modelSelect.appendChild(option);
-    });
+    }
 
     // Show/hide endpoint based on provider
-    if (endpointInput) {
+    if (endpointInput && endpointInput.parentElement) {
         const localProviders = ['ollama', 'lmstudio', 'llamacpp'];
         const isLocal = localProviders.includes(provider);
         endpointInput.parentElement.style.display = isLocal ? 'block' : 'none';
 
-        if (isLocal) {
+        if (isLocal && !endpointInput.value) {
             const defaultEndpoints = {
                 ollama: 'http://localhost:11434',
                 lmstudio: 'http://localhost:1234',
                 llamacpp: 'http://localhost:8080'
             };
-            if (!endpointInput.value) {
-                endpointInput.value = defaultEndpoints[provider] || '';
-            }
+            endpointInput.value = defaultEndpoints[provider] || '';
         }
     }
 }
@@ -789,23 +868,34 @@ function initializeModelLists() {
     updateModelList('orquestador');
     updateModelList('implementador');
 
-    // Set saved values
+    // Set saved values if not already set by loadSettingsUI
     const s = state.settings;
     setInputValue('orquestadorProvider', s.orquestador.provider);
     setInputValue('implementadorProvider', s.implementador.provider);
 
-    // Update lists with saved providers
-    updateModelList('orquestador');
-    updateModelList('implementador');
-
-    // Now set the saved models
-    setInputValue('orquestadorModel', s.orquestador.model);
-    setInputValue('implementadorModel', s.implementador.model);
-    setInputValue('orquestadorEndpoint', s.orquestador.endpoint);
-    setInputValue('implementadorEndpoint', s.implementador.endpoint);
-    setInputValue('orquestadorTemp', s.orquestador.temperature);
-    setInputValue('implementadorTemp', s.implementador.temperature);
+    // Now set the saved models (needs delay for async population)
+    setTimeout(() => {
+        if (s.orquestador.model) setInputValue('orquestadorModel', s.orquestador.model);
+        if (s.implementador.model) setInputValue('implementadorModel', s.implementador.model);
+    }, 500);
 }
+
+// Ensure settings are loaded correctly on init
+document.addEventListener('DOMContentLoaded', () => {
+    // Listen for model detection events
+    window.addEventListener('modelsDetected', () => {
+        updateLocalCatalogs();
+        // Refresh dropdowns if settings panel is open
+        if (document.querySelector('.settings-modal.active')) {
+            updateModelList('orquestador');
+            updateModelList('implementador');
+        }
+    });
+
+    // Initial detection
+    setTimeout(initializeModelLists, 100);
+});
+
 
 // ===============================
 // Connection Tests
@@ -996,54 +1086,90 @@ Responde con código cuando sea apropiado. Usa bloques de código markdown.
 Sé conciso y práctico. Muestra ejemplos de código cuando sea útil.`
 };
 
-function selectChatAgent(agent) {
+async function selectChatAgent(agent) {
     chatState.currentAgent = agent;
 
-    // Update UI
+    // Update active button state
     document.querySelectorAll('.agent-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.agent === agent);
+        const isActive = btn.dataset.agent === agent;
+        btn.classList.toggle('active', isActive);
+
+        // Also update visual indication in button
+        if (isActive) {
+            const status = state.agents[agent]?.status || 'offline';
+            btn.querySelector('svg').style.color = status === 'online' ? 'var(--success)' : 'currentColor';
+        }
     });
 
     // Update context display
-    const settings = state.settings[agent];
-    document.getElementById('chatProvider').textContent = settings.provider || 'Ollama';
-    document.getElementById('chatModel').textContent = settings.model || 'llama3.2';
-
-    // Check connection
-    updateChatStatus();
+    await updateChatContextDisplay();
 }
 
-async function updateChatStatus() {
+async function updateChatContextDisplay() {
     const agent = chatState.currentAgent;
     const settings = state.settings[agent];
+
+    const providerEl = document.getElementById('chatProvider');
+    const modelEl = document.getElementById('chatModel');
     const statusEl = document.getElementById('chatStatus');
 
-    const provider = settings.provider || 'ollama';
-    let isConnected = false;
+    if (providerEl) providerEl.textContent = settings.provider || 'No configurado';
+    if (modelEl) modelEl.textContent = settings.model || 'No seleccionado';
+
+    // Check connection
+    if (statusEl) {
+        statusEl.innerHTML = '<span class="status-dot warning"></span> Verificando...';
+        statusEl.className = 'context-value status-indicator warning';
+
+        const isConnected = await checkProviderConnection(settings.provider);
+
+        statusEl.innerHTML = `<span class="status-dot"></span> ${isConnected ? 'Conectado' : 'Desconectado'}`;
+        statusEl.className = `context-value status-indicator ${isConnected ? 'connected' : 'disconnected'}`;
+
+        // Update agent status in state
+        if (state.agents[agent]) {
+            state.agents[agent].status = isConnected ? 'online' : 'offline';
+        }
+    }
+}
+
+async function checkProviderConnection(provider) {
+    if (!provider) return false;
 
     try {
         if (provider === 'ollama') {
-            const endpoint = state.settings.integrations.ollama?.endpoint || 'http://localhost:11434';
-            const response = await fetch(`${endpoint}/api/tags`, { method: 'GET' });
-            isConnected = response.ok;
+            const res = await verifyOllama();
+            return res.ok;
         } else if (provider === 'lmstudio') {
-            const endpoint = state.settings.integrations.lmstudio?.endpoint || 'http://localhost:1234';
-            const response = await fetch(`${endpoint}/v1/models`, { method: 'GET' });
-            isConnected = response.ok;
+            const res = await verifyLMStudio();
+            return res.ok;
         } else if (['openai', 'anthropic', 'google', 'mistral', 'groq'].includes(provider)) {
-            // For cloud providers, check if API key is set
+            // Check if key is configured
             const key = state.settings.integrations[provider];
-            isConnected = !!key;
+            return !!key && key.length > 10;
         } else {
-            isConnected = true; // Antigravity, Cursor, etc.
+            return false; // Unknown provider
         }
     } catch (e) {
-        isConnected = false;
+        console.warn('Connection check failed:', e);
+        return false;
     }
-
-    statusEl.innerHTML = `<span class="status-dot"></span>${isConnected ? 'Conectado' : 'Desconectado'}`;
-    statusEl.className = `context-value status-indicator${isConnected ? ' connected' : ''}`;
 }
+
+// Initial update
+document.addEventListener('DOMContentLoaded', () => {
+    // Escuchar cambios de configuración para actualizar UI
+    const observer = new MutationObserver(() => {
+        if (document.querySelector('.chat-panel.active')) {
+            updateChatContextDisplay();
+        }
+    });
+
+    // Watch for config changes in state proxy if possible, or just use event
+    window.addEventListener('settingsChanged', () => {
+        updateChatContextDisplay();
+    });
+});
 
 function handleChatKeydown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
