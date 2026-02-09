@@ -2144,3 +2144,240 @@ kbd {
     background: rgba(var(--error-rgb), 0.15);
     color: var(--error);
 }
+
+/* ===============================
+   Model Detection Styles
+   =============================== */
+.models-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.provider-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.provider-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.provider-icon {
+    font-size: 1.5rem;
+}
+
+.provider-name {
+    font-weight: 600;
+    flex: 1;
+}
+
+.provider-status {
+    font-size: 0.875rem;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.provider-status.connected {
+    background: rgba(var(--success-rgb), 0.15);
+    color: var(--success);
+}
+
+.provider-status.disconnected {
+    background: rgba(var(--error-rgb), 0.15);
+    color: var(--error);
+}
+
+.provider-models {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.model-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.model-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.model-card.selected {
+    border-color: var(--accent-primary);
+    background: rgba(var(--accent-primary-rgb), 0.1);
+}
+
+.model-name {
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: capitalize;
+}
+
+.model-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.model-meta span {
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+}
+
+.no-models {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.no-models code {
+    background: var(--bg-tertiary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.model-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: 12px;
+}
+
+.model-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.model-status.connected {
+    background: rgba(var(--success-rgb), 0.1);
+    color: var(--success);
+}
+
+.model-status.connected .status-dot {
+    background: var(--success);
+}
+
+.model-status.disconnected {
+    background: rgba(var(--error-rgb), 0.1);
+    color: var(--error);
+}
+
+.model-status.disconnected .status-dot {
+    background: var(--error);
+}
+
+.model-status.warning {
+    background: rgba(var(--warning-rgb), 0.1);
+    color: var(--warning);
+}
+
+.model-status.warning .status-dot {
+    background: var(--warning);
+}
+
+.btn-detect {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.btn-detect:hover {
+    background: var(--accent-secondary);
+}
+
+.model-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.model-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* ===============================
+   Memory Stats
+   =============================== */
+.memory-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.memory-stat {
+    background: var(--bg-secondary);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.memory-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.memory-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+/* ===============================
+   RAG Context
+   =============================== */
+.rag-context {
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--accent-primary);
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 0.875rem;
+}
+
+.rag-source {
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-bottom: 4px;
+}
+
+.rag-relevance {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
