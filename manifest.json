@@ -1,0 +1,36 @@
+{
+    "name": "AgentHub",
+    "short_name": "AgentHub",
+    "description": "Sistema de cooperación multi-agente IA",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0f",
+    "theme_color": "#6366f1",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%236366f1'/><circle cx='50' cy='50' r='15' fill='white' opacity='0.9'/><path d='M50 10 L50 25 M50 75 L50 90 M10 50 L25 50 M75 50 L90 50 M22 22 L32 32 M68 68 L78 78 M22 78 L32 68 M68 32 L78 22' stroke='white' stroke-width='4' stroke-linecap='round'/></svg>",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ],
+    "categories": [
+        "productivity",
+        "developer tools"
+    ],
+    "lang": "es",
+    "shortcuts": [
+        {
+            "name": "Nueva Tarea",
+            "short_name": "Tarea",
+            "description": "Crear una nueva tarea",
+            "url": "/?action=new-task"
+        },
+        {
+            "name": "Chat IA",
+            "short_name": "Chat",
+            "description": "Abrir chat con agentes",
+            "url": "/?section=chat"
+        }
+    ]
+}

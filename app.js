@@ -1061,7 +1061,10 @@ async function sendChatMessage() {
     input.value = '';
 
     // Add user message
-    addChatMessage('user', message);
+    const userMsg = addChatMessage('user', message);
+    if (typeof saveChatMessage === 'function') {
+        await saveChatMessage(userMsg);
+    }
 
     // Show typing indicator
     chatState.isGenerating = true;
@@ -1069,8 +1072,48 @@ async function sendChatMessage() {
     document.getElementById('sendBtn').disabled = true;
 
     try {
-        const response = await generateAIResponse(message);
-        addChatMessage('agent', response);
+        const agent = chatState.currentAgent;
+        const settings = state.settings[agent];
+        const provider = settings.provider || 'ollama';
+        const model = settings.model || 'llama3.2';
+
+        // Check if streaming is available
+        const useStreaming = (provider === 'ollama' || provider === 'lmstudio') &&
+            typeof streamOllamaResponse === 'function';
+
+        if (useStreaming) {
+            // Create placeholder message for streaming
+            const msgEl = addChatMessageElement('agent', '');
+            const textEl = msgEl.querySelector('.message-text');
+            textEl.classList.add('streaming-cursor');
+
+            const messages = buildMessageHistory(message);
+            const streamFn = provider === 'ollama' ? streamOllamaResponse : streamLMStudioResponse;
+
+            await streamFn(model, messages,
+                (chunk, fullText) => {
+                    textEl.innerHTML = typeof parseMarkdown === 'function'
+                        ? parseMarkdown(fullText)
+                        : formatMessageText(fullText);
+                    document.getElementById('chatMessages').scrollTop =
+                        document.getElementById('chatMessages').scrollHeight;
+                },
+                async (finalText) => {
+                    textEl.classList.remove('streaming-cursor');
+                    const agentMsg = { type: 'agent', text: finalText, agent: chatState.currentAgent };
+                    chatState.messages.push(agentMsg);
+                    if (typeof saveChatMessage === 'function') {
+                        await saveChatMessage(agentMsg);
+                    }
+                }
+            );
+        } else {
+            const response = await generateAIResponse(message);
+            const agentMsg = addChatMessage('agent', response);
+            if (typeof saveChatMessage === 'function') {
+                await saveChatMessage(agentMsg);
+            }
+        }
     } catch (error) {
         addChatMessage('agent', `❌ Error: ${error.message}\n\nAsegúrate de que el proveedor esté configurado correctamente en la sección de Configuración.`);
     } finally {
@@ -1078,6 +1121,17 @@ async function sendChatMessage() {
         document.getElementById('typingIndicator').style.display = 'none';
         document.getElementById('sendBtn').disabled = false;
     }
+}
+
+function buildMessageHistory(userMessage) {
+    return [
+        { role: 'system', content: agentPrompts[chatState.currentAgent] },
+        ...chatState.messages.slice(-10).map(m => ({
+            role: m.type === 'user' ? 'user' : 'assistant',
+            content: m.text
+        })),
+        { role: 'user', content: userMessage }
+    ];
 }
 
 function addChatMessage(type, text) {
@@ -1096,6 +1150,12 @@ function addChatMessage(type, text) {
 
     chatState.messages.push(message);
 
+    addChatMessageElement(type, text, message.timestamp);
+    return message;
+}
+
+function addChatMessageElement(type, text, timestamp = new Date().toISOString()) {
+    const messagesContainer = document.getElementById('chatMessages');
     const messageEl = document.createElement('div');
     messageEl.className = `message ${type}`;
 
@@ -1105,20 +1165,27 @@ function addChatMessage(type, text) {
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0113 0"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>';
 
+    const formattedText = typeof parseMarkdown === 'function' ? parseMarkdown(text) : formatMessageText(text);
+
     messageEl.innerHTML = `
         <div class="message-avatar">${avatarSvg}</div>
         <div class="message-content">
-            <div class="message-text">${formatMessageText(text)}</div>
-            <div class="message-time">${formatTime(message.timestamp)}</div>
+            <div class="message-text">${formattedText}</div>
+            <div class="message-time">${formatTime(timestamp)}</div>
         </div>
     `;
 
     messagesContainer.appendChild(messageEl);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    return messageEl;
 }
 
 function formatMessageText(text) {
-    // Basic markdown parsing
+    // Use enhanced markdown parser if available
+    if (typeof parseMarkdown === 'function') {
+        return parseMarkdown(text);
+    }
+    // Fallback basic markdown parsing
     return text
         .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
