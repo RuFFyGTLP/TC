@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-02-09T01:58:00Z",
+  "session": {
+    "active": false,
+    "started_at": null,
+    "task_count": 0
+  },
+  "agents": {
+    "orquestador": {
+      "status": "offline",
+      "last_seen": null,
+      "current_task": null
+    },
+    "implementador": {
+      "status": "offline",
+      "last_seen": null,
+      "current_task": null
+    }
+  },
+  "locks": {},
+  "pending_handoffs": [],
+  "counters": {
+    "task_id": 0,
+    "handoff_id": 0
+  }
+}
