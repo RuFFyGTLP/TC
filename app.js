@@ -26,7 +26,12 @@ const state = {
 // ===============================
 // Initialize App
 // ===============================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load environment variables first
+    if (typeof loadEnv === 'function') {
+        await loadEnv();
+    }
+
     loadState();
     setupNavigation();
     setupTaskForm();
